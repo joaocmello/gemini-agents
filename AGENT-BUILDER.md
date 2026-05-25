@@ -3,9 +3,8 @@
 <!--
 ## Description:
 Processo canônico para construção de Gemini Agents neste projeto.
-Estende a estrutura de quatro pilares (Persona · Task · Context · Format)
-com o ciclo de vida do Gemini Enterprise Agent Designer, adaptado para
-focar em agrupamentos de Sub-Agents como Skills.
+Define o ciclo de 4 etapas: Objetivo → Decomposição → Sub-Agents → Orquestrador.
+Alinhado com o Agent Designer do Gemini Enterprise (documentação Google, fev/2025).
 
 ## Usage Note:
 Use este documento como referência principal ao criar qualquer novo Agent.
@@ -13,8 +12,8 @@ Leia integralmente antes de escrever qualquer instrução.
 
 ## Attribution:
 Autoria de João Mello em colaboração com Claude (Anthropic).
-Estrutura do Agent Designer adaptada da documentação do Gemini Enterprise.
-Modelo de Sub-Agent inspirado em padrões de arquitetura modular de skills.
+Processo baseado na documentação oficial do Gemini Enterprise Agent Designer.
+Modelo de Sub-Agent alinhado ao fluxo nativo do Agent Designer (Add subagent).
 
 ## Licensing:
 MIT License
@@ -28,226 +27,389 @@ Date: May 25, 2026
 
 Este documento é a **referência de processo principal** para construir Gemini Agents neste projeto.
 
-Ele introduz uma escolha arquitetural deliberada: **agrupar capacidades relacionadas como Sub-Agents (Skills) dentro de um único Agent**, em vez de construir muitos Agents independentes e roteá-los dentro de um orquestrador genérico.
+Todo Agent criado aqui segue uma arquitetura de **orquestrador + sub-agents**: o agente principal não executa tarefas diretamente — ele entende a intenção do usuário e delega para sub-agents especializados, cada um responsável por uma ação específica e bem definida.
 
 A hipótese que este processo foi desenhado para testar:
 
-> **Um Agent focado com Sub-Agent Skills bem definidos é mais confiável, aprendível e sustentável do que um orquestrador único que acumula Agents independentes.**
+> **Um orquestrador que delega para sub-agents especializados é mais confiável, sustentável e fácil de evoluir do que um agente único que acumula todas as capacidades em um bloco monolítico de instruções.**
 
-Cada Agent construído com este processo é um dado de validação dessa hipótese. Registre suas observações em `## Post-Launch Notes` no arquivo de instrução de cada Agent.
-
----
-
-## Ciclo de Construção em 3 Etapas
-
-### Etapa 1 — Defina Identidade e Propósito
-
-Antes de escrever qualquer instrução, responda estas três perguntas por escrito. Elas se tornam a descrição pública do Agent.
-
-**1a. Nome**
-Claro, específico ao papel, e instantaneamente reconhecível para alguém que nunca usou o Agent.
-
-Bom: `Facilitador de Jornada do Cliente`
-Ruim: `Agente PM 3` ou `Helper`
-
-**1b. Goal Description (uma frase)**
-O que este Agent ajuda o usuário a realizar? Esta é a resposta para "quando devo usar este Agent versus outro?"
-
-Exemplo: `Ajuda PMs a construir mapas de jornada do cliente através de facilitação estruturada, do mapeamento de fricção até o plano de intervenção.`
-
-**1c. Capability Boundary**
-O que está explicitamente FORA do escopo? Isso protege o Agent contra expansão de escopo e o mantém focado.
-
-Exemplo: `Este Agent não executa pesquisa de mercado, priorização de backlog, ou análise competitiva.`
+Cada Agent construído com este processo é um dado de validação dessa hipótese. Registre suas observações em `## Post-Launch Notes` no arquivo `instructions.md` de cada Agent.
 
 ---
 
-### Etapa 2 — Desenhe a Arquitetura de Sub-Agent Skills
+## Como o Agent Designer do Gemini Enterprise funciona
 
-Esta é a parte estrutural central do processo. Em vez de escrever um grande bloco de instrução, decomponha as capacidades do Agent em **Sub-Agents discretos**, cada um responsável por uma skill única e bem definida.
+Antes de criar, entenda o modelo nativo da plataforma:
 
-#### O que é um Sub-Agent (Skill)?
+- O **Agent Designer** permite criar agentes single-step (um único bloco de instruções) e **multi-step** (um agente principal com sub-agents).
+- Em um agente multi-step, o **agente principal é o orquestrador**: ele recebe a mensagem do usuário, decide qual sub-agent ativar, e delega a execução.
+- Cada **sub-agent** é uma entidade independente com seu próprio nome, descrição e instruções — configurado separadamente no canvas Flow via **"Add subagent"**.
+- O orquestrador e cada sub-agent têm seus próprios campos: **Name**, **Description**, **Instructions**, e opcionalmente **Starter Prompts** (no orquestrador).
 
-Um Sub-Agent é um módulo de capacidade autocontido dentro do Agent. Ele tem:
-- **Trigger** — quando o Agent principal ativa este skill?
-- **Modo de persona** — a voz do Agent muda? Se não, escreva "mantém voz principal".
-- **Escopo de task** — o que este skill produz?
-- **Output contract** — como é o output quando o skill termina?
+Este processo de 4 etapas foi desenhado para preparar todo o conteúdo necessário antes de você abrir o Agent Designer — chegando na plataforma com clareza sobre o que criar.
 
-Sub-Agents **não são Gemini Agents separados**. São modos comportamentais declarados dentro do conjunto de instruções de um único Agent, ativados pelo Agent orquestrador com base no contexto do usuário.
+---
 
-#### Regras de Design de Sub-Agents
-
-1. **Uma skill, um trabalho.** Cada Sub-Agent faz uma coisa bem. Se você escrever "e também" na descrição de task de um Sub-Agent, divida-o.
-2. **Nomeie cada skill explicitamente.** Dê um rótulo que o Agent principal possa referenciar por nome (ex: `[Skill: Facilitação de Escopo]`).
-3. **Defina a condição de ativação.** O Agent principal precisa saber exatamente quando invocar cada skill. Escreva a condição em linguagem simples.
-4. **Defina o output contract.** O skill deve produzir um artefato ou formato de resposta específico e previsível. O Agent principal depende disso para continuar.
-5. **Skills são composáveis.** Uma única sessão de usuário pode ativar múltiplos skills em sequência. Desenhe cada skill para que seu output possa ser consumido pelo próximo.
-
-#### Template de Sub-Agent Map
+## Ciclo de Construção em 4 Etapas
 
 ```
-## Sub-Agent Map
-
-### [Skill: Nome do Skill]
-- Trigger: [Quando este skill é ativado — o que o usuário disse ou fez?]
-- Persona mode: [Há mudança de tom ou voz? Se não, escreva "mantém voz principal".]
-- Task: [O que este skill produz?]
-- Output contract: [Como é o output? Formato, seções, extensão esperada.]
-- Hands off to: [Nome do próximo skill, ou "encerramento" se for o último.]
-
-### [Skill: Nome do Skill]
-...
-```
-
-#### Exemplo de Sub-Agent Map (Agent de Jornada do Cliente)
-
-```
-## Sub-Agent Map
-
-### [Skill: Facilitação de Escopo]
-- Trigger: Usuário inicia sessão ou não tem escopo definido.
-- Persona mode: Mantém voz principal (consultor estratégico colaborativo).
-- Task: Guiar o usuário para definir persona, momento doloroso, e escopo de jornada.
-- Output contract: Resumo de 3 decisões — persona, escopo, e foco de resultado.
-- Hands off to: [Skill: Geração de Jornada]
-
-### [Skill: Geração de Jornada]
-- Trigger: Escopo definido (saída do Skill anterior confirmada).
-- Persona mode: Mantém voz principal.
-- Task: Produzir o mapa de jornada completo em formato de tabela Markdown canônico.
-- Output contract: Tabela com linhas fixas × colunas de etapas + Top 3 pontos de fricção.
-- Hands off to: [Skill: Plano de Intervenção]
-
-### [Skill: Plano de Intervenção]
-- Trigger: Tabela de jornada gerada e confirmada pelo usuário.
-- Persona mode: Mantém voz principal.
-- Task: Gerar recomendações de intervenção e assumptions a validar.
-- Output contract: Lista numerada de intervenções + bullets de assumptions + 3 opções de próximo passo.
-- Hands off to: Encerramento.
+Etapa 1          Etapa 2              Etapa 3               Etapa 4
+Objetivo    →    Decomposição    →    Sub-Agents    →    Orquestrador
+(O que?)         (Quais ações?)       (Como cada um        (Como o todo
+                                       funciona?)            funciona?)
 ```
 
 ---
 
-### Etapa 3 — Escreva o Conjunto de Instruções com os Quatro Pilares
+### Etapa 1 — Entenda o Objetivo do Agent
 
-Com o Sub-Agent Map definido, traduza a arquitetura em texto de instrução do Agent usando os quatro pilares: **Persona · Task · Context · Format**.
+Antes de qualquer decisão técnica, responda três perguntas em linguagem simples. Estas respostas guiam todas as etapas seguintes.
 
-O Sub-Agent Map fica na seção **Context** como tabela de roteamento explícita.
+**1a. Qual problema este Agent resolve?**
+Descreva o problema do usuário, não a solução técnica.
 
-#### Template de Conjunto de Instruções
+Bom: `"PMs perdem tempo tentando estruturar uma jornada do cliente do zero — não sabem por onde começar nem qual escopo priorizar."`
+Ruim: `"Preciso de um agente que gera mapas de jornada."`
+
+**1b. O que o usuário consegue fazer com este Agent que não conseguia antes?**
+Esta é a proposta de valor. Uma frase.
+
+Exemplo: `"Com este Agent, um PM consegue sair de um problema vago para um mapa de jornada estruturado com plano de intervenção em uma única sessão."`
+
+**1c. O que este Agent explicitamente NÃO faz?**
+Defina o limite de escopo agora, antes de qualquer instrução. Isso evita que o Agent vire um canivete suíço.
+
+Exemplo: `"Este Agent não realiza pesquisa de mercado, priorização de backlog ou análise competitiva."`
+
+> **Sinal de alerta:** Se você não consegue responder 1b em uma frase, o objetivo ainda não está claro o suficiente. Refine antes de avançar.
+
+---
+
+### Etapa 2 — Decomponha em Ações Distintas
+
+Com o objetivo claro, mapeie **todas as ações discretas** que precisam acontecer para que o Agent entregue o resultado prometido.
+
+#### Como decompor
+
+Liste cada ação que o Agent precisa realizar, na ordem natural de execução. Use verbos de ação. Seja granular.
+
+**Exemplo — Agent de Jornada do Cliente:**
+1. Receber o contexto inicial do usuário
+2. Identificar se o escopo está definido ou não
+3. Facilitar a definição de persona e momento doloroso
+4. Facilitar a escolha do escopo de jornada
+5. Gerar o mapa de jornada em formato de tabela
+6. Identificar os principais pontos de fricção
+7. Gerar recomendações de intervenção
+8. Listar assumptions a validar
+9. Apresentar opções de próximo passo
+
+#### Agrupe ações em clusters coesos
+
+Depois de listar, agrupe as ações em clusters onde cada grupo representa uma **responsabilidade única e coesa**. Cada cluster vai se tornar um sub-agent.
+
+**Regras de agrupamento:**
+- Ações do mesmo cluster compartilham contexto e dependem umas das outras
+- Ações de clusters diferentes podem ser executadas de forma independente
+- Se um cluster tiver mais de 4–5 ações, considere dividir em dois
+- Se um cluster tiver apenas 1 ação simples, considere fundir com outro
+
+**Exemplo — clusters do Agent de Jornada:**
+
+| Cluster | Ações incluídas | Nome do Sub-Agent |
+|---------|----------------|-------------------|
+| A | 1, 2, 3, 4 | Facilitador de Escopo |
+| B | 5, 6 | Gerador de Jornada |
+| C | 7, 8, 9 | Planejador de Intervenção |
+
+> **Princípio central:** Se você precisar escrever "e também" na descrição de um cluster, ele precisa ser dividido.
+
+---
+
+### Etapa 3 — Escreva as Instruções de Cada Sub-Agent
+
+Cada cluster identificado na Etapa 2 se torna um sub-agent independente. Escreva as instruções de cada um usando os **quatro pilares**: Persona · Task · Context · Format.
+
+#### O que é um Sub-Agent neste contexto
+
+No Agent Designer do Gemini Enterprise, cada sub-agent é configurado separadamente com seu próprio conjunto de campos. Aqui você prepara o conteúdo desses campos antes de entrar na plataforma.
+
+**Campos que você vai preencher no Agent Designer para cada sub-agent:**
+- **Name** — nome claro e específico à função
+- **Description** — uma frase descrevendo o que este sub-agent faz
+- **Instructions** — o bloco completo de instruções (Persona · Task · Context · Format)
+
+#### Template de Instrução para Sub-Agent
 
 ```
+# Sub-Agent: [Nome]
+
+## Metadados (para o Agent Designer)
+- Name: [Nome do sub-agent — claro e específico]
+- Description: [Uma frase: o que este sub-agent faz e quando é ativado]
+
 ## Persona
-[Define o papel que o Gemini desempenha. Qual expertise ele incorpora?
-Qual é a voz e a atitude? O que ele faz quando cumprimentado ou quando
-o usuário pergunta o que ele pode fazer?]
+[Qual especialista este sub-agent encarna? Qual é a voz e o tom?
+Como ele responde quando recebe uma solicitação?]
 
 ## Task
-[Declare o entregável principal claramente. O que este Agent cria ou
-facilita? Liste os Sub-Agents ativos como subtarefas explícitas.]
-
-Subtarefas (Skills ativos):
-- [Skill: Nome] — [uma linha descrevendo o que produz]
-- [Skill: Nome] — [uma linha descrevendo o que produz]
-- [Skill: Nome] — [uma linha descrevendo o que produz]
+[O que este sub-agent produz? Seja específico sobre o entregável.
+Liste as ações que ele executa, na ordem.]
 
 ## Context
 Idioma: Sempre responda em português brasileiro, independentemente do idioma usado pelo usuário.
 
-Comportamento de boas-vindas: [O que o Agent diz quando o usuário abre
-a sessão sem contexto? Inclua uma frase curta de orientação e um exemplo de uso.]
+Input esperado: [O que este sub-agent recebe do orquestrador ou do usuário?]
 
-Sub-Agent Routing:
-[Cole aqui o Sub-Agent Map completo da Etapa 2.]
+Regras de operação:
+- [Regra 1 — comportamento específico deste sub-agent]
+- [Regra 2]
+- [Regra 3]
 
-Regras de facilitação (remova se o Agent for modo execução pura):
-1. Faça uma pergunta por vez. Nunca agrupe múltiplas perguntas.
-2. Aplique inversão de esforço: colete contexto mínimo primeiro, depois proponha opções.
-3. Em cada decisão, ofereça exatamente 3 opções. A recomendada sempre primeiro, com justificativa.
-4. Fraseie as opções na linguagem da persona primeiro; adicione tradução de negócio depois.
-5. Aceite `1`, `2`, `3`, `1 e 3`, ou direção personalizada.
-6. Mostre progresso depois de cada resposta (ex: `Progresso: 2/4 inputs capturados`).
-7. Encerre toda sessão com: decisões tomadas, assumptions a validar, 3 opções de próximo passo.
+Contexto ausente: [Se o input necessário estiver faltando, o que o sub-agent deve fazer?
+Máximo de 2 perguntas antes de prosseguir com assumptions rotuladas.]
 
-Limites de escopo:
-- [O que este Agent NÃO faz. Seja explícito.]
-- Se o usuário pedir algo fora do escopo, o Agent reconhece e redireciona sem julgamento.
-
-Contexto ausente:
-- Se a informação necessária para ativar um Skill estiver faltando, faça no máximo
-  3 perguntas (uma por vez) antes de prosseguir com assumptions explicitamente rotuladas.
+Limites: [O que este sub-agent NÃO faz. Redireciona para quem?]
 
 ## Format
-[Descreva a estrutura de output de cada Skill com precisão. Inclua templates
-de seção, exemplos de formatação, orientação de extensão e qualquer template
-canônico a preservar.]
+Output contract: [Descrição precisa do formato de saída — estrutura, seções, extensão.]
 
-### Output do [Skill: Nome]
-[Template específico deste skill]
+[Template de output, se aplicável:]
+---
+[seção 1]
+[seção 2]
+[seção 3]
+---
+```
 
-### Output do [Skill: Nome]
-[Template específico deste skill]
+#### Regras de escrita para sub-agents
 
-### Encerramento padrão
-Toda sessão encerra com exatamente N opções de próximo passo numeradas de 1 a N,
-com a opção 1 marcada como Recomendada.
+1. **Instruções autocontidas.** Cada sub-agent deve funcionar sem depender de memória de outras sessões ou de outros sub-agents. Inclua no Context tudo que ele precisa saber.
+2. **Output contract preciso.** O orquestrador depende de um output previsível para continuar o fluxo. Defina formato, seções e extensão esperada.
+3. **Limites explícitos.** Diga ao sub-agent o que ele não deve fazer e para onde redirecionar se o usuário pedir algo fora do escopo.
+4. **Sem comentários `<!-- -->`** no texto final — toda lógica deve estar em texto visível e executável.
+
+#### Exemplo — Sub-Agent: Facilitador de Escopo
+
+```
+# Sub-Agent: Facilitador de Escopo
+
+## Metadados
+- Name: Facilitador de Escopo
+- Description: Guia o usuário para definir persona, momento doloroso e escopo
+  de jornada antes de qualquer geração de conteúdo.
+
+## Persona
+Você é um consultor estratégico de produto com experiência em facilitação
+de discovery. Seu estilo é colaborativo, curioso e direto. Você nunca gera
+um mapa sem antes entender claramente quem é o usuário e qual é o problema.
+Quando recebe uma solicitação vaga, você faz perguntas cirúrgicas — uma
+por vez — até ter o contexto mínimo necessário.
+
+## Task
+Guiar o usuário através de uma sequência de decisões para definir:
+1. A persona-alvo da jornada
+2. O momento doloroso ou oportunidade central
+3. O escopo da jornada (quais etapas cobrir)
+
+Ao final, produza um resumo das 3 decisões tomadas para ser usado pelo
+próximo sub-agent.
+
+## Context
+Idioma: Sempre responda em português brasileiro, independentemente do
+idioma usado pelo usuário.
+
+Input esperado: Qualquer descrição inicial do usuário sobre o que ele
+quer mapear — pode ser vaga ou detalhada.
+
+Regras de operação:
+- Faça uma pergunta por vez. Nunca agrupe múltiplas perguntas.
+- Colete contexto mínimo primeiro, depois proponha opções.
+- Em cada decisão, ofereça exatamente 3 opções. A recomendada sempre
+  primeiro, com uma linha de justificativa. Adicione tradução de negócio
+  para cada opção.
+- Aceite respostas numéricas (1, 2, 3) ou direção personalizada.
+- Mostre progresso após cada resposta: "Progresso: 2/3 decisões tomadas."
+
+Contexto ausente: Se o usuário não mencionar nem uma persona nem um
+problema, pergunte pelo problema primeiro. Máximo de 2 perguntas antes
+de propor opções com base em assumptions rotuladas.
+
+Limites: Este sub-agent não gera mapas de jornada nem planos de
+intervenção. Ao concluir as 3 decisões, entrega o resumo e indica
+que o próximo passo é a geração da jornada.
+
+## Format
+Output contract: Bloco de texto estruturado com as 3 decisões, pronto
+para ser consumido pelo sub-agent Gerador de Jornada.
+
+---
+**Resumo de Escopo — Jornada do Cliente**
+
+- **Persona:** [nome/perfil definido]
+- **Momento doloroso / Oportunidade:** [descrição da situação central]
+- **Escopo da jornada:** [etapas que serão mapeadas]
+
+*Pronto para geração do mapa. Confirma ou quer ajustar algum ponto?*
+---
 ```
 
 ---
 
-## Starter Prompts (UX de Entrada)
+### Etapa 4 — Escreva as Instruções do Orquestrador
 
-Todo Agent deve ter **4 Starter Prompts** — frases clicáveis que aparecem na tela inicial do Gemini e ensinam o usuário a interagir antes de qualquer conversa.
+O orquestrador é o agente principal. Ele é o primeiro ponto de contato com o usuário e o responsável por entender a intenção e delegar para o sub-agent correto.
 
-### Regras para Starter Prompts
+**O orquestrador não executa tarefas.** Ele:
+- Recebe a mensagem do usuário
+- Identifica a intenção
+- Ativa o sub-agent adequado
+- Mantém a coerência da experiência ao longo da sessão
 
-1. Cada prompt deve ativar um fluxo diferente (idealmente um Sub-Agent diferente).
-2. Escreva em primeira pessoa do usuário: "Quero mapear...", "Me ajuda a...", "Cria um..."
-3. Inclua contexto suficiente para que o Agent saiba qual Skill ativar.
-4. Evite prompts genéricos como "Como funciona?" ou "Pode me ajudar?".
+#### Campos do Orquestrador no Agent Designer
 
-### Template de Starter Prompts
+| Campo | O que colocar |
+|-------|--------------|
+| **Name** | Nome público do Agent — claro e orientado ao usuário |
+| **Description** | Uma frase: o que este Agent faz e para quem |
+| **Instructions** | Bloco completo (Persona · Task · Context · Format) |
+| **Starter Prompts** | 4 prompts que ativam fluxos diferentes |
+
+#### Template de Instrução para o Orquestrador
 
 ```
-Starter Prompt 1: [Ativa o Skill principal — fluxo mais comum]
-Starter Prompt 2: [Ativa um Skill secundário específico]
-Starter Prompt 3: [Começa sem contexto — testa o comportamento de boas-vindas]
+# Orquestrador: [Nome do Agent]
+
+## Persona
+[Qual é a identidade deste Agent para o usuário? Qual expertise ele
+representa? Como ele se apresenta quando cumprimentado? O que ele diz
+quando o usuário pergunta "o que você faz?"
+
+Inclua: papel, voz, tom, e uma frase de boas-vindas com exemplo de uso.]
+
+## Task
+Este Agent orquestra um fluxo de [N] etapas para ajudar o usuário a
+[objetivo definido na Etapa 1b].
+
+Ele não executa tarefas diretamente. Ele identifica a intenção do usuário
+e delega para o sub-agent correspondente:
+
+| Intenção do usuário | Sub-Agent ativado |
+|---------------------|------------------|
+| [Condição de ativação] | [Nome do Sub-Agent] |
+| [Condição de ativação] | [Nome do Sub-Agent] |
+| [Condição de ativação] | [Nome do Sub-Agent] |
+
+## Context
+Idioma: Sempre responda em português brasileiro, independentemente do
+idioma usado pelo usuário.
+
+Comportamento de boas-vindas: Quando o usuário abrir a sessão sem contexto,
+apresente-se em 2–3 linhas e ofereça um exemplo concreto de uso. Não liste
+todas as capacidades — mostre o fluxo mais comum.
+
+Regras de orquestração:
+1. Sempre identifique a intenção antes de delegar. Se a intenção não
+   estiver clara, faça uma única pergunta de clarificação.
+2. Delegue para apenas um sub-agent por vez.
+3. Ao receber o output de um sub-agent, apresente-o ao usuário e pergunte
+   se deseja continuar para a próxima etapa ou ajustar algo.
+4. Mantenha o histórico de decisões da sessão visível para o usuário.
+5. Se o usuário pedir algo fora do escopo do Agent, reconheça e redirecione
+   sem julgamento. Não tente executar o que está além do escopo.
+
+Fluxo padrão da sessão:
+[Descreva a sequência esperada de ativação dos sub-agents para o caso de uso principal.]
+
+Exemplo:
+1. Usuário descreve o problema → Orquestrador ativa [Sub-Agent A]
+2. [Sub-Agent A] entrega resumo → Orquestrador apresenta e confirma
+3. Usuário confirma → Orquestrador ativa [Sub-Agent B]
+4. [Sub-Agent B] entrega output → Orquestrador apresenta e oferece próximos passos
+
+Limites do Agent: [O que este Agent não faz — repita o definido na Etapa 1c.]
+
+## Format
+O orquestrador não tem um formato de output fixo — ele adapta a apresentação
+ao conteúdo entregue por cada sub-agent.
+
+Regras de apresentação:
+- Ao apresentar o output de um sub-agent, adicione uma linha de contexto
+  antes ("Aqui está o resultado da etapa X:") e uma pergunta de continuidade
+  depois ("Quer prosseguir para [próxima etapa] ou ajustar algo?").
+- Mantenha respostas do orquestrador curtas. O conteúdo fica nos sub-agents.
+- Encerre toda sessão com: decisões tomadas, assumptions a validar, e
+  exatamente 3 opções de próximo passo (opção 1 = Recomendada).
+```
+
+#### Starter Prompts do Orquestrador
+
+Todo orquestrador deve ter **4 Starter Prompts** — frases clicáveis que ensinam o usuário a interagir antes de qualquer conversa.
+
+**Regras:**
+1. Cada prompt ativa um fluxo diferente (idealmente um sub-agent diferente).
+2. Escreva em primeira pessoa do usuário.
+3. Inclua contexto suficiente para que o orquestrador saiba qual sub-agent ativar.
+4. Evite prompts genéricos como "Como funciona?" ou "Pode me ajudar?".
+
+**Template:**
+```
+Starter Prompt 1: [Fluxo completo — caso de uso mais comum]
+Starter Prompt 2: [Ativa um sub-agent específico diretamente]
+Starter Prompt 3: [Usuário sem contexto — testa o comportamento de boas-vindas]
 Starter Prompt 4: [Caso de borda — contexto parcial ou pedido incomum]
 ```
 
 ---
 
+## Estrutura de Arquivos por Agent
+
+Cada Agent criado neste projeto deve ter sua própria pasta em `agents/` com a seguinte estrutura:
+
+```
+agents/
+└── [nome-do-agent]/
+    ├── overview.md          # Etapas 1 e 2: objetivo, ações e clusters
+    ├── subagent-[nome].md   # Etapa 3: instrução de cada sub-agent (um arquivo por sub-agent)
+    └── instructions.md      # Etapa 4: instrução do orquestrador + Starter Prompts
+```
+
+O arquivo `instructions.md` é o que vai para o campo **Instructions** do agente principal no Agent Designer. Os arquivos `subagent-*.md` vão para o campo **Instructions** de cada sub-agent configurado via "Add subagent".
+
+---
+
 ## Checklist de Qualidade
 
-Antes de finalizar qualquer instrução de Agent, verifique:
+Antes de publicar qualquer Agent no Agent Designer, verifique:
 
-**Identidade e Arquitetura**
-- [ ] Nome é específico e reconhecível sem contexto adicional
-- [ ] Goal Description responde "quando usar este Agent vs. outro"
-- [ ] Capability Boundary define explicitamente o que está fora do escopo
-- [ ] Sub-Agent Map está completo com triggers, output contracts e handoffs
+**Etapa 1 — Objetivo**
+- [ ] O problema do usuário está descrito (não a solução técnica)
+- [ ] A proposta de valor está em uma frase
+- [ ] O limite de escopo está definido explicitamente
 
-**Instrução (Quatro Pilares)**
+**Etapa 2 — Decomposição**
+- [ ] Todas as ações necessárias estão listadas
+- [ ] As ações estão agrupadas em clusters coesos
+- [ ] Cada cluster tem uma responsabilidade única (sem "e também")
+- [ ] O número de sub-agents está definido
+
+**Etapa 3 — Sub-Agents**
+- [ ] Cada sub-agent tem: Name, Description e Instructions completas
+- [ ] Instruções seguem os 4 pilares (Persona · Task · Context · Format)
+- [ ] Regra de idioma presente em cada sub-agent: "Sempre responda em português brasileiro..."
+- [ ] Output contract está definido com precisão
+- [ ] Limites estão explícitos (o que o sub-agent não faz)
+- [ ] Contexto ausente tem tratamento definido (máx. 2 perguntas)
+- [ ] Nenhum bloco `<!-- -->` no texto final
+
+**Etapa 4 — Orquestrador**
 - [ ] Regra de idioma presente: "Sempre responda em português brasileiro..."
-- [ ] Persona define voz, expertise e comportamento de boas-vindas
-- [ ] Task lista todos os Skills como subtarefas explícitas
-- [ ] Context inclui o Sub-Agent Map completo como tabela de roteamento
-- [ ] Context define comportamento para contexto ausente (máx. 3 perguntas)
-- [ ] Format tem template de output para cada Skill individualmente
-- [ ] Nenhum bloco de comentário `<!-- -->` no texto final — toda lógica em texto visível
-
-**Facilitation Agents (se aplicável)**
-- [ ] Regras do PDF Loop presentes no Context
-- [ ] Turnos usam uma pergunta por vez
-- [ ] Decision forks têm exatamente 3 opções, recomendada primeiro
-- [ ] Encerramento define decisões, assumptions e próximos passos
-
-**Starter Prompts**
-- [ ] 4 Starter Prompts definidos
-- [ ] Cada um ativa um fluxo ou Skill diferente
-- [ ] Escritos em primeira pessoa do usuário
-- [ ] Nenhum prompt genérico ou auto-referencial
+- [ ] Persona inclui comportamento de boas-vindas
+- [ ] Tabela de delegação lista todos os sub-agents com condições de ativação
+- [ ] Fluxo padrão da sessão está descrito
+- [ ] Limites do Agent estão explícitos
+- [ ] Encerramento padrão definido (decisões + assumptions + 3 próximos passos)
+- [ ] 4 Starter Prompts configurados, cada um ativando um fluxo diferente
 
 ---
 
@@ -257,31 +419,44 @@ Use esta tabela ao adaptar assets do repositório fonte para este formato.
 
 | Elemento do PM Prompt | → Destino no Agent Builder |
 |----------------------|---------------------------|
-| AI role e voz | → **Persona** |
-| Entregável principal | → **Task** (skill principal) |
-| Regras de facilitação, PDF Loop | → **Context** (Facilitation rules) |
-| Required Context Keys | → **Context** (Contexto ausente) |
-| Missing Context Rule | → **Context** (máx. 3 perguntas) |
-| Output Format com template | → **Format** (output do skill correspondente) |
-| Final Step options | → **Format** (Encerramento padrão) |
-| Múltiplas seções de output | → **Sub-Agent Map** (um skill por seção) |
-| Attribution / Licensing | → Omitir do Agent; preservar no arquivo `.md` local |
+| AI role e voz | → **Persona** do orquestrador ou sub-agent |
+| Entregável principal | → **Task** do sub-agent responsável |
+| Regras de facilitação, PDF Loop | → **Context** do sub-agent facilitador |
+| Required Context Keys | → **Context** (Input esperado) de cada sub-agent |
+| Missing Context Rule | → **Context** (Contexto ausente) — máx. 2 perguntas |
+| Output Format com template | → **Format** (Output contract) do sub-agent |
+| Final Step options | → **Format** do orquestrador (Encerramento padrão) |
+| Múltiplas seções de output | → Decomposição em sub-agents distintos (Etapa 2) |
+| Attribution / Licensing | → Omitir das instruções; preservar no `overview.md` |
 
 ---
 
-## Decisão de Design: Sub-Agent Skills vs. Orquestrador Único
+## Decisão de Design: Orquestrador + Sub-Agents vs. Agente Monolítico
 
-| Dimensão | Sub-Agent Skills | Orquestrador Único |
-|----------|-----------------|-------------------|
-| Previsibilidade de output | Alta — cada skill tem output contract fixo | Variável — depende do contexto acumulado |
-| Facilidade de manutenção | Alta — edite um skill sem afetar outros | Baixa — mudanças cascateiam |
-| Curva de aprendizado do usuário | Moderada — precisa entender quais skills existem | Baixa — um Agent faz tudo |
-| Risco de deriva de escopo | Baixo — boundary explícita por skill | Alto — o orquestrador acumula comportamentos |
-| Composabilidade | Alta — skills encadeiam naturalmente | Baixa — outputs raramente alimentam outros Agents |
+| Dimensão | Orquestrador + Sub-Agents | Agente Monolítico |
+|----------|--------------------------|-------------------|
+| Previsibilidade de output | Alta — cada sub-agent tem output contract fixo | Variável — depende do contexto acumulado |
+| Facilidade de manutenção | Alta — edite um sub-agent sem afetar os outros | Baixa — mudanças em uma parte cascateiam |
+| Clareza de responsabilidade | Alta — cada sub-agent tem uma função clara | Baixa — tudo misturado em um bloco |
+| Evolução incremental | Alta — adicione sub-agents sem reescrever o todo | Baixa — qualquer adição exige revisão completa |
+| Risco de deriva de escopo | Baixo — limites explícitos por sub-agent | Alto — o agente acumula comportamentos com o tempo |
+| Curva de aprendizado inicial | Moderada — requer planejamento antes de escrever | Baixa — começa rápido, mas escala mal |
 
-**Como registrar observações:** Ao encerrar uma sessão de uso com um Agent construído neste modelo, adicione uma entrada em `## Post-Launch Notes` no arquivo `instructions.md` do Agent com:
+**Como registrar observações:** Ao encerrar uma sessão de uso com um Agent construído neste modelo, adicione uma entrada em `## Post-Launch Notes` no `instructions.md` do Agent com:
 - Data
-- Qual skill foi mais ativado
-- Onde o roteamento falhou (se falhou)
-- Se o output contract foi respeitado
-- Comparação subjetiva com a experiência de usar um orquestrador único equivalente
+- Qual sub-agent foi mais ativado
+- Onde a delegação falhou (se falhou)
+- Se os output contracts foram respeitados
+- Comparação subjetiva com a abordagem de agente monolítico equivalente
+
+---
+
+## Arquivos Relacionados
+
+| Arquivo | Função |
+|---------|--------|
+| `README.md` | Visão geral do repositório e como usar |
+| `agents/README.md` | Catálogo de todos os Agents disponíveis |
+| `agents/[nome]/overview.md` | Objetivo e decomposição de cada Agent (Etapas 1–2) |
+| `agents/[nome]/subagent-*.md` | Instruções de cada sub-agent (Etapa 3) |
+| `agents/[nome]/instructions.md` | Instrução do orquestrador (Etapa 4) |
