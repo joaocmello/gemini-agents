@@ -1,129 +1,146 @@
-# PRD Creator — Multi-Step Agent
+# PRD Creator
 
-Sistema multi-agente para criação de Product Requirement Documents (PRDs) no Gemini. Desenvolvido para times de produto brasileiros com foco na entrega de documentação pronta para engenharia e design.
+**Versão:** v2.0 — Modo Proativo
+**Última atualização:** Mai/2026
 
----
-
-## Estrutura dos Agentes
-
-```
-gemini-agents/prd-creator/
-├── orchestrator.md          ← Gem principal (configure este no Gemini)
-├── sub-agent-intake.md      ← Sub-agente de descoberta
-├── sub-agent-prd-writer.md  ← Sub-agente de escrita e montagem
-└── README.md                ← Este arquivo
-```
+Agent de criação de Product Requirement Documents que analisa documentos de discovery e entrega um rascunho completo antes de fazer qualquer pergunta.
 
 ---
 
-## Arquitetura
+## O que mudou na v2.0
+
+A versão anterior fazia perguntas campo a campo antes de produzir qualquer documento. O PM fazia o trabalho que o agente deveria fazer.
+
+A v2.0 inverte o fluxo:
+
+| Antes (v1) | Agora (v2) |
+|-----------|------------|
+| Agent pergunta → PM responde → document cresce | PM entrega material → Agent analisa → rascunho completo |
+| 13 perguntas antes de ver qualquer documento | Rascunho completo na primeira resposta |
+| PM define cada campo | Agent infere, PM valida e corrige |
+| Campos em branco se PM não souber | Campos preenchidos com suposições sinalizadas |
+
+---
+
+## Estrutura dos Arquivos
 
 ```
-[PM] ←→ [Orchestrator]
-              ↓
-    [Intake Agent]          Fase 1: Descoberta
-    Faz perguntas uma       (13 campos, um por vez)
-    por vez, exibe PRD      Aceita "não sei" / "pular"
-    parcial a cada turn     
-              ↓
-    [PRD Writer Agent]      Fase 2: Escrita
-    Recebe contexto,        Refina linguagem, preenche
-    monta PRD completo,     suposições, formata eventos
-    aceita revisões         
-              ↓
-    [Orchestrator]          Fase 3: Revisão e Entrega
-    Revisão final,          Confirma com PM, oferece
-    4 opções de próx passo  4 opções de próximo passo
+agents/prd-creator/
+├── overview.md                    ← Objetivo e decomposição (AGENT-BUILDER etapas 1–2)
+├── subagent-document-analyzer.md  ← Skill de leitura e classificação do material
+├── subagent-draft-builder.md      ← Skill de montagem do rascunho completo
+├── subagent-refinement-loop.md    ← Skill de refinamento seção por seção
+├── instructions.md                ← Orquestrador principal (configure este no Gemini)
+└── README.md                      ← Este arquivo
+```
+
+---
+
+## Arquitetura de Skills
+
+```
+[PM envia documento]
+        ↓
+[Document Analyzer]     Classifica cada campo: ✅ inferido / 🟡 suposição / 🔴 ausente
+        ↓
+[Draft Builder]         Preenche todas as seções com marcadores de confiança
+        ↓              Apresenta rascunho completo → PM valida em bloco
+[Refinement Loop]       Uma pergunta por vez para 🟡 e 🔴
+        ↓
+[Orquestrador]          Documento final + 4 próximos passos
 ```
 
 ---
 
 ## Como Configurar no Gemini
 
-### Opção A — Gem Único (recomendado para começar)
+### Opção A — Gem Único (recomendado)
 
-Configure um único Gem com o conteúdo do `orchestrator.md`. O Gemini simula os sub-agentes internamente dentro da mesma sessão.
-
-**Nome do Gem:** `PRD Creator`
-
-**Instruções:** Cole o conteúdo completo de `orchestrator.md`, seguido pelos prompts de sistema dos dois sub-agentes, separados por seções:
+1. Crie um novo Gem no Gemini com o nome **"PRD Creator"**
+2. No campo **Instructions**, cole o conteúdo de `instructions.md`
+3. Logo abaixo, adicione uma seção separada com os três sub-agents:
 
 ```
-[CONTEÚDO DE orchestrator.md]
+[CONTEÚDO DE instructions.md]
 
 ---
 
-## Sub-Agente: Intake Agent
-[CONTEÚDO DE sub-agent-intake.md]
+## Sub-Agent Skill: Document Analyzer
+[CONTEÚDO DE subagent-document-analyzer.md]
 
 ---
 
-## Sub-Agente: PRD Writer Agent  
-[CONTEÚDO DE sub-agent-prd-writer.md]
+## Sub-Agent Skill: Draft Builder
+[CONTEÚDO DE subagent-draft-builder.md]
+
+---
+
+## Sub-Agent Skill: Refinement Loop
+[CONTEÚDO DE subagent-refinement-loop.md]
 ```
 
-### Opção B — Gems Separados (para uso com Gemini API + orquestração programática)
+4. Configure os **Starter Prompts** sugeridos:
+   - `Tenho um documento de discovery ou oportunidades — quero transformar em PRD`
+   - `Quero criar um PRD do zero para uma nova feature`
+   - `Tenho um PRD incompleto — quero preencher as lacunas`
 
-Configure três Gems distintos e conecte-os via API usando o Orchestrator como controlador:
+### Opção B — Gems Separados (para implementação via API)
 
-1. `prd-orchestrator` — Gem de controle de fluxo
-2. `prd-intake` — Gem de descoberta  
-3. `prd-writer` — Gem de escrita
+Configure 4 Gems distintos:
+- `prd-orchestrator` → `instructions.md`
+- `prd-document-analyzer` → `subagent-document-analyzer.md`
+- `prd-draft-builder` → `subagent-draft-builder.md`
+- `prd-refinement-loop` → `subagent-refinement-loop.md`
+
+Conecte via Gemini API passando o estado entre eles.
 
 ---
 
 ## Comportamento Esperado
 
-### Sessão típica:
+### Sessão com documento (fluxo padrão)
 
-**Turno 1 — PM:**
-> "Quero criar um PRD para uma feature de wishlist no app."
+**PM:** *(cola documento de oportunidades da página de produto)*
 
-**Turno 1 — Agent:**
-> 📋 **Fase 1 — Descoberta**  
-> Ótimo! Vou te ajudar a construir o PRD da feature de Wishlist.  
->  
-> Qual é o problema principal que essa feature resolve, e quem é o usuário afetado?
+**Agent:**
+> 📄 Rascunho inicial do PRD gerado a partir do material fornecido.
+>
+> Analisei o documento e preenchi o máximo possível...
+>
+> [PRD completo com marcadores ✅ 🟡 🔴]
+>
+> **O rascunho está no caminho certo?**
 
-**Turno 2 — PM:**  
-> "Usuários perdem produtos que querem comprar depois. São clientes recorrentes do app."
+**PM:** Sim, pode refinar.
 
-**Turno 2 — Agent:**
-> [Exibe PRD parcial com contexto preenchido]  
-> 📊 Progresso: 1/13 campos capturados  
->  
-> Quais são os objetivos desta iniciativa para o negócio e para o usuário?
-
-*[...continua por até 13 turnos de intake...]*
-
-**Turno 14 — Agent:**
-> ✅ Intake concluído — 11/13 campos capturados  
-> [Exibe PRD completo com todos os campos]  
->  
-> 📋 **Fase 2 — Escrita e Refinamento**  
-> [PRD Writer refina e completa o documento]
-
-**Turno final — Agent:**
-> ✅ PRD finalizado — pronto para entrega  
-> [Documento final completo]  
->  
-> Qual o próximo passo?  
-> 1. Refinar métricas e adicionar OKRs *(Recomendado)*  
-> 2. Detalhar critérios de aceite em Gherkin  
-> 3. Gerar briefing executivo para stakeholders  
-> 4. Exportar como arquivo Markdown
+**Agent:**
+> 📝 Métricas de Sucesso — campo 1 de 4 pendentes
+>
+> O documento menciona aumentar a taxa de conversão, mas não especifica uma meta. Qual é o número que o time está mirando para considerar essa feature um sucesso?
+>
+> 💡 Sugestão baseada no material: +5% na taxa de conversão em 90 dias 🟡
 
 ---
 
-## Referências
+### Sessão sem documento (fallback)
 
-- Prompt base: adaptado do PRD Gem prompt (documento de texto em anexo)
-- Exemplo de PRD: [POC] Review Social na PDP de Centauro (PDF em anexo)
-- Framework: Persona · Task · Context · Format (Google Gemini Gems)
-- Metodologia: PDF Loop do repositório `product-manager-prompts`
+**PM:** Quero criar um PRD do zero para uma nova feature
+
+**Agent:**
+> Qual é a feature e o problema principal que ela resolve? Me dê o máximo de contexto que tiver e eu monto o primeiro rascunho.
+
+**PM:** *(descreve a feature)*
+
+**Agent:**
+> 📄 Rascunho inicial do PRD...
+> [segue o fluxo padrão]
 
 ---
 
-## Idioma
+## Marcadores de Confiança
 
-Todos os agentes respondem **exclusivamente em português brasileiro**, independentemente do idioma da entrada do usuário.
+| Marcador | Significado | Ação do PM |
+|----------|-------------|------------|
+| ✅ (sem marcador) | Extraído diretamente do material | Revisar se necessário |
+| 🟡 Suposição: [...] | Inferido com raciocínio documentado | Confirmar ou corrigir |
+| 🔴 [A preencher] | Ausente no material | Fornecer no refinamento |
