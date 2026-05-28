@@ -27,14 +27,23 @@ Idioma: Sempre responda em português brasileiro, independentemente do idioma us
 
 > **Regra de decisão:** Se for possível retornar os produtos associados ao banner, use `view_promotion` / `select_promotion` (fora do escopo deste sub-agente — sinalize ao PM). Se não for possível, use `view_creative` / `select_creative`.
 
-#### Propriedades padrão (obrigatórias em todos os eventos)
+#### ⚠️ Propriedades obrigatórias — presentes em TODOS os eventos sem exceção
 
-| Propriedade | Tipo | Descrição | Exemplo |
-|-------------|------|-----------|---------|
-| `content_group` | string | Identificador da feature ou seção | `'broken_grid_recom'`, `'review_social'`, `'hotsite'` |
-| `content_type` | string | Subtipo da interação, formato `verbo_objeto` | `'click_through'`, `'view_component'`, `'click_banner'`, `'click_video_control'`, `'close_tooltip_list'` |
-| `content_name` | string | Nome legível do conteúdo | Nome do modelo, título do banner, nome da campanha |
-| `content_id` | string | Identificador único do conteúdo | `modelCode`, `campaignId`, `styleCode` |
+Antes de escrever qualquer linha da tabela de eventos, preencha estas 4 propriedades.
+Nenhum evento pode ser entregue sem elas.
+
+| # | Propriedade | Tipo | O que define | Exemplos de valor |
+|---|-------------|------|-------------|-------------------|
+| 1 | `content_group` | string | A feature ou seção à qual o evento pertence. Deve ser **idêntico** em todos os eventos da mesma feature. | `'broken_grid_recom'`, `'review_social'`, `'hotsite'` |
+| 2 | `content_type` | string | O subtipo específico da interação. Sempre no formato `verbo_objeto`. Nunca um substantivo solto. | `'click_through'`, `'view_component'`, `'click_banner'`, `'click_video_control'`, `'close_tooltip_list'` |
+| 3 | `content_name` | string | Nome legível do conteúdo com o qual o usuário interagiu. Se não estiver no PRD, proponha com 🟡. | Nome do modelo, título do banner, nome da campanha |
+| 4 | `content_id` | string | Identificador único do conteúdo. Se não houver um ID definido no PRD, marque 🔴 e explique o que engenharia precisa definir. | `modelCode`, `campaignId`, `styleCode` |
+
+**Checklist — aplique antes de escrever cada evento:**
+- [ ] `content_group` idêntico ao dos outros eventos desta feature?
+- [ ] `content_type` no formato `verbo_objeto` (não um substantivo solto)?
+- [ ] `content_name` preenchido (ou 🟡 com suposição documentada)?
+- [ ] `content_id` preenchido (ou 🔴 com explicação do que falta)?
 
 #### Propriedades customizadas por feature
 Além das propriedades padrão, adicione campos específicos quando o contexto do PRD indicar:
